@@ -4,7 +4,6 @@
 //!
 //! For simplicity, only `u64` data type is allowed.
 
-use std::vec;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Point {
@@ -68,7 +67,7 @@ impl Line {
 }
 
 /// A greedy method to get spline points.
-/// Note that the underlying data should be sorted and unique.
+/// Note that the underlying data should be sorted.
 pub struct GreedySplineCorridor<'a> {
     data: &'a Vec<u64>,
     max_error: usize,
@@ -88,11 +87,24 @@ impl<'a> GreedySplineCorridor<'a> {
 
         let mut base = Point::new(self.data[0], 0);
 
+        // skip the repeated data
+        // `idx` is the first index differs from `self.data[0]`
+        let mut idx: usize = 1;
+        while idx < self.data.len() && self.data[idx] == self.data[0] {
+            idx += 1;
+        }
         // error corridor bounds
-        let mut upper = Point::new(self.data[1], 1 + self.max_error);
-        let mut lower = Point::new(self.data[1], 1usize.saturating_sub(self.max_error));
+        let mut upper = Point::new(self.data[idx], idx + self.max_error);
+        let mut lower = Point::new(self.data[idx], idx.saturating_sub(self.max_error));
 
-        for (i, &key) in self.data[2..].iter().enumerate() {
+        // note `i` starts from `0`.
+        for (i, &key) in self.data[idx+1..].iter().enumerate() {
+            // skip the repeated data
+            if key == upper.key || key == lower.key {
+                continue;
+            }
+
+            let i = i + idx + 1;
             let point_c = Point::new(key, i);
 
             // line BC (base -> point_c)
@@ -148,12 +160,27 @@ mod test {
 
     #[test]
     fn spline_points() {
-        let data: Vec<u64> = vec![3, 4, 8, 10, 11, 12];
+        let data: Vec<u64> = vec![3, 4, 8, 10, 19, 20];
 
         let spline = GreedySplineCorridor::new(&data, 1);
 
+        println!("{:?}", spline.spline_points());
+
         assert_eq!(
-            vec![Point::new(3, 0), Point::new(4, 1), Point::new(12, 5)],
+            vec![Point::new(3, 0), Point::new(10, 3), Point::new(20, 5)],
+            spline.spline_points()
+        );
+    }
+
+    #[test]
+    fn spline_repeated_points() {
+        let data: Vec<u64> = vec![3, 4, 8, 8, 10, 10, 19, 20];
+
+        let spline = GreedySplineCorridor::new(&data, 1);
+
+        println!("{:?}", spline.spline_points());
+        assert_eq!(
+            vec![Point::new(3, 0), Point::new(10, 5), Point::new(20, 7)],
             spline.spline_points()
         );
     }
