@@ -5,7 +5,7 @@
 //! For simplicity, only `u64` data type is allowed.
 
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug)]
 pub struct Point {
     key: u64,        // x
     position: usize, // y
@@ -16,6 +16,26 @@ impl Point {
         Point { key, position }
     }
 }
+
+impl PartialEq for Point {
+    fn eq(&self, other: &Self) -> bool {
+        self.key == other.key
+    }
+}
+
+impl PartialOrd for Point {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        self.key.partial_cmp(&other.key)
+    }
+}
+
+impl Ord for Point {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.key.cmp(&other.key)
+    }
+}
+
+impl Eq for Point {}
 
 enum Direction {
     Left,
@@ -79,7 +99,7 @@ impl<'a> GreedySplineCorridor<'a> {
         GreedySplineCorridor { data, max_error }
     }
 
-    pub fn spline_points(&self) -> Vec<Point> {
+    fn spline_points(&self) -> Vec<Point> {
         assert!(self.data.len() > 3);
 
         let mut points = vec![];
@@ -140,6 +160,27 @@ impl<'a> GreedySplineCorridor<'a> {
         points.push(Point::new(self.data[n - 1], n - 1));
         points
     }
+
+    pub fn search(&self, key: u64) -> Option<usize> {
+        let key_point = Point::new(key, 0); // the search position can be arbitrary
+        let points = self.spline_points(); // to do: `points` should be stored
+        match points.binary_search(&key_point) {
+            Ok(idx) => Some(points[idx].position),
+            Err(idx) if idx > 0 => {
+                let start = points[idx - 1];
+                let end = points[idx];
+                let predicted = start.position as f64 + (key as f64 - start.key as f64) * (end.position as f64 - start.position as f64) / (end.key as f64 - start.key as f64);
+                let from = (predicted - self.max_error as f64).ceil() as usize;
+                let to = (predicted + self.max_error as f64).floor() as usize;
+                // binary search `from` `to` for `data`
+                match self.data[from..=to].binary_search(&key) {
+                    Ok(p) => Some(p+from),
+                    _ => None,
+                }
+            },
+            _ => None
+        }
+    }
 }
 
 #[cfg(test)]
@@ -164,8 +205,6 @@ mod test {
 
         let spline = GreedySplineCorridor::new(&data, 1);
 
-        println!("{:?}", spline.spline_points());
-
         assert_eq!(
             vec![Point::new(3, 0), Point::new(10, 3), Point::new(20, 5)],
             spline.spline_points()
@@ -178,10 +217,25 @@ mod test {
 
         let spline = GreedySplineCorridor::new(&data, 1);
 
-        println!("{:?}", spline.spline_points());
         assert_eq!(
             vec![Point::new(3, 0), Point::new(10, 5), Point::new(20, 7)],
             spline.spline_points()
         );
+    }
+
+    #[test]
+    fn search() {
+        let data: Vec<u64> = vec![3, 4, 8, 8, 10, 10, 19, 20];
+
+        let spline = GreedySplineCorridor::new(&data, 1);
+        
+        println!("{:?}", spline.search(8));
+
+        println!("{:?}", spline.search(10));
+
+        println!("{:?}", spline.search(4));
+
+        println!("{:?}", spline.search(5));
+        
     }
 }
