@@ -54,20 +54,21 @@ impl Line {
     }
 
     fn get_direction(&self, other: &Line) -> Direction {
+        // dy can be less than 0
         let (dy, dx) = (
-            self.end.position - self.start.position,
+            self.end.position as f64 - self.start.position as f64,
             self.end.key - self.start.key,
         );
         assert!(dx > 0);
 
         let (other_dy, other_dx) = (
-            other.end.position - other.start.position,
+            other.end.position as f64 - other.start.position as f64,
             other.end.key - other.start.key,
         );
         assert!(other_dx > 0);
 
-        let sin = dy as f64 / dx as f64;
-        let other_sin = other_dy as f64 / other_dx as f64;
+        let sin = dy / dx as f64;
+        let other_sin = other_dy / other_dx as f64;
 
         match sin.partial_cmp(&other_sin) {
             Some(std::cmp::Ordering::Equal) => Direction::Coincide,
@@ -91,34 +92,37 @@ impl Line {
 pub struct GreedySplineCorridor<'a> {
     data: &'a Vec<u64>,
     max_error: usize,
+    points: Vec<Point>,
 }
 
 // to do: how to handle repeated elements?
+// There is a bug for repeated elements as sometimes `dx` can be 0
+// the assert can fail in this case.
 impl<'a> GreedySplineCorridor<'a> {
     pub fn new(data: &'a Vec<u64>, max_error: usize) -> Self {
-        GreedySplineCorridor { data, max_error }
+        GreedySplineCorridor { data, max_error, points: GreedySplineCorridor::spline_points(data, max_error) }
     }
 
-    fn spline_points(&self) -> Vec<Point> {
-        assert!(self.data.len() > 3);
+    fn spline_points(data: &Vec<u64>, max_error: usize) -> Vec<Point> {
+        assert!(data.len() > 3);
 
         let mut points = vec![];
-        points.push(Point::new(self.data[0], 0));
+        points.push(Point::new(data[0], 0));
 
-        let mut base = Point::new(self.data[0], 0);
+        let mut base = Point::new(data[0], 0);
 
         // skip the repeated data
         // `idx` is the first index differs from `self.data[0]`
         let mut idx: usize = 1;
-        while idx < self.data.len() && self.data[idx] == self.data[0] {
+        while idx < data.len() && data[idx] == data[0] {
             idx += 1;
         }
         // error corridor bounds
-        let mut upper = Point::new(self.data[idx], idx + self.max_error);
-        let mut lower = Point::new(self.data[idx], idx.saturating_sub(self.max_error));
+        let mut upper = Point::new(data[idx], idx + max_error);
+        let mut lower = Point::new(data[idx], idx.saturating_sub(max_error));
 
         // note `i` starts from `0`.
-        for (i, &key) in self.data[idx+1..].iter().enumerate() {
+        for (i, &key) in data[idx+1..].iter().enumerate() {
             // skip the repeated data
             if key == upper.key || key == lower.key {
                 continue;
@@ -135,14 +139,14 @@ impl<'a> GreedySplineCorridor<'a> {
             let bl = Line::new(base, lower);
 
             if bc.is_left(&bu) || bc.is_right(&bl) {
-                base = Point::new(self.data[i - 1], i - 1);
+                base = Point::new(data[i - 1], i - 1);
                 points.push(base);
 
-                upper = Point::new(point_c.key, i + self.max_error);
-                lower = Point::new(point_c.key, i.saturating_sub(self.max_error));
+                upper = Point::new(point_c.key, i + max_error);
+                lower = Point::new(point_c.key, i.saturating_sub(max_error));
             } else {
-                let _upper = Point::new(point_c.key, i + self.max_error);
-                let _lower = Point::new(point_c.key, i.saturating_sub(self.max_error));
+                let _upper = Point::new(point_c.key, i + max_error);
+                let _lower = Point::new(point_c.key, i.saturating_sub(max_error));
 
                 // line BU' (base -> _upper)
                 let _bu = Line::new(base, _upper);
@@ -156,23 +160,22 @@ impl<'a> GreedySplineCorridor<'a> {
                 }
             }
         }
-        let n = self.data.len();
-        points.push(Point::new(self.data[n - 1], n - 1));
+        let n = data.len();
+        points.push(Point::new(data[n - 1], n - 1));
         points
     }
 
     pub fn search(&self, key: u64) -> Option<usize> {
         let key_point = Point::new(key, 0); // the search position can be arbitrary
-        let points = self.spline_points(); // to do: `points` should be stored
-        match points.binary_search(&key_point) {
-            Ok(idx) => Some(points[idx].position),
+        match self.points.binary_search(&key_point) {
+            Ok(idx) => Some(self.points[idx].position),
             Err(idx) if idx > 0 => {
-                let start = points[idx - 1];
-                let end = points[idx];
+                let start = self.points[idx - 1];
+                let end = self.points[idx];
                 let predicted = start.position as f64 + (key as f64 - start.key as f64) * (end.position as f64 - start.position as f64) / (end.key as f64 - start.key as f64);
                 let from = (predicted - self.max_error as f64).ceil() as usize;
                 let to = (predicted + self.max_error as f64).floor() as usize;
-                // binary search `from` `to` for `data`
+                // binary search `from` `to` in `data`
                 match self.data[from..=to].binary_search(&key) {
                     Ok(p) => Some(p+from),
                     _ => None,
@@ -185,6 +188,8 @@ impl<'a> GreedySplineCorridor<'a> {
 
 #[cfg(test)]
 mod test {
+    use std::collections::HashSet;
+
     use super::*;
 
     #[test]
@@ -207,7 +212,7 @@ mod test {
 
         assert_eq!(
             vec![Point::new(3, 0), Point::new(10, 3), Point::new(20, 5)],
-            spline.spline_points()
+            spline.points
         );
     }
 
@@ -219,7 +224,7 @@ mod test {
 
         assert_eq!(
             vec![Point::new(3, 0), Point::new(10, 5), Point::new(20, 7)],
-            spline.spline_points()
+            spline.points
         );
     }
 
@@ -229,13 +234,31 @@ mod test {
 
         let spline = GreedySplineCorridor::new(&data, 1);
         
-        println!("{:?}", spline.search(8));
+        assert_eq!(spline.search(8), Some(3));
 
-        println!("{:?}", spline.search(10));
+        assert_eq!(spline.search(10), Some(5));
 
-        println!("{:?}", spline.search(4));
+        assert_eq!(spline.search(4), Some(1));
 
-        println!("{:?}", spline.search(5));
+        assert_eq!(spline.search(5), None);
+    }
+
+    #[test]
+    fn large_search() {
+        use rand::{distributions::Uniform, Rng};
+
+        let range = Uniform::from(0..10000000);
+        let data: HashSet<u64> = rand::thread_rng().sample_iter(&range).take(100000).collect();
+        // use `HashSet` to remove duplicated elements (some bug here)
+        let mut data: Vec<u64> = data.into_iter().collect();
+        data.push(8128);
         
+        data.sort_unstable();
+        
+        let spline = GreedySplineCorridor::new(&data, 32);
+
+        if let Ok(idx) = data.binary_search(&8128) {
+            assert_eq!(Some(idx), spline.search(8128));
+        }
     }
 }
