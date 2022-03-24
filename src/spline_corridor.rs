@@ -7,8 +7,8 @@
 
 #[derive(Clone, Copy, Debug)]
 pub struct Point {
-    key: u64,        // x
-    position: usize, // y
+    pub key: u64,        // x
+    pub position: usize, // y
 }
 
 impl Point {
@@ -99,12 +99,13 @@ pub struct GreedySplineCorridor<'a> {
     points: Vec<Point>,
 }
 
-// to do: how to handle repeated elements?
-// There is a bug for repeated elements as sometimes `dx` can be 0
-// the assert can fail in this case.
 impl<'a> GreedySplineCorridor<'a> {
     pub fn new(data: &'a Vec<u64>, max_error: usize) -> Self {
         GreedySplineCorridor { data, max_error, points: GreedySplineCorridor::spline_points(data, max_error) }
+    }
+
+    pub fn points(&self) -> &Vec<Point> {
+        &self.points
     }
 
     fn spline_points(data: &Vec<u64>, max_error: usize) -> Vec<Point> {
