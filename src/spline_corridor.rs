@@ -53,6 +53,10 @@ impl Line {
         Line { start, end }
     }
 
+    fn is_vertical(&self) -> bool {
+        self.start.key == self.end.key
+    }
+
     fn get_direction(&self, other: &Line) -> Direction {
         // dy can be less than 0
         let (dy, dx) = (
@@ -111,24 +115,14 @@ impl<'a> GreedySplineCorridor<'a> {
 
         let mut base = Point::new(data[0], 0);
 
-        // skip the repeated data
-        // `idx` is the first index differs from `self.data[0]`
-        let mut idx: usize = 1;
-        while idx < data.len() && data[idx] == data[0] {
-            idx += 1;
-        }
         // error corridor bounds
-        let mut upper = Point::new(data[idx], idx + max_error);
-        let mut lower = Point::new(data[idx], idx.saturating_sub(max_error));
+        let mut upper = Point::new(data[1], 1 + max_error);
+        let mut lower = Point::new(data[1], 1usize.saturating_sub(max_error));
 
         // note `i` starts from `0`.
-        for (i, &key) in data[idx+1..].iter().enumerate() {
-            // skip the repeated data
-            if key == upper.key || key == lower.key {
-                continue;
-            }
+        for (i, &key) in data[2..].iter().enumerate() {
 
-            let i = i + idx + 1;
+            let i = i + 2;
             let point_c = Point::new(key, i);
 
             // line BC (base -> point_c)
@@ -137,6 +131,14 @@ impl<'a> GreedySplineCorridor<'a> {
             let bu = Line::new(base, upper);
             // line BL (base -> lower)
             let bl = Line::new(base, lower);
+
+            // continue if `bc` or `bu` or `bl`'s `dx` is 0
+            // skip the repeated values
+            if bc.is_vertical() || bu.is_vertical() || bl.is_vertical() {
+                upper = Point::new(point_c.key, i + max_error);
+                lower = Point::new(point_c.key, i.saturating_sub(max_error));
+                continue;
+            }
 
             if bc.is_left(&bu) || bc.is_right(&bl) {
                 base = Point::new(data[i - 1], i - 1);
@@ -180,6 +182,11 @@ impl<'a> GreedySplineCorridor<'a> {
                     Ok(p) => Some(p+from),
                     _ => None,
                 }
+                // how about linear search after predicating?
+                // match self.data[from..=to].iter().position(|&x| x == key) {
+                //     Some(i) => Some(i + from),
+                //     _ => None,
+                // } 
             },
             _ => None
         }
@@ -188,8 +195,6 @@ impl<'a> GreedySplineCorridor<'a> {
 
 #[cfg(test)]
 mod test {
-    use std::collections::HashSet;
-
     use super::*;
 
     #[test]
@@ -236,7 +241,7 @@ mod test {
         
         assert_eq!(spline.search(8), Some(3));
 
-        assert_eq!(spline.search(10), Some(5));
+        assert_eq!(spline.search(10), Some(4));
 
         assert_eq!(spline.search(4), Some(1));
 
@@ -246,19 +251,30 @@ mod test {
     #[test]
     fn large_search() {
         use rand::{distributions::Uniform, Rng};
+        use std::time::Instant;
 
         let range = Uniform::from(0..10000000);
-        let data: HashSet<u64> = rand::thread_rng().sample_iter(&range).take(100000).collect();
-        // use `HashSet` to remove duplicated elements (some bug here)
-        let mut data: Vec<u64> = data.into_iter().collect();
-        data.push(8128);
+        let mut data: Vec<u64> = rand::thread_rng().sample_iter(&range).take(1000000).collect();
+
+        let value = 10000;
+        data.push(value);
         
         data.sort_unstable();
         
         let spline = GreedySplineCorridor::new(&data, 32);
 
-        if let Ok(idx) = data.binary_search(&8128) {
-            assert_eq!(Some(idx), spline.search(8128));
+        let start = Instant::now();
+        if let Some(idx) = spline.search(value) {
+            assert_eq!(data[idx], value);
         }
+        let elapsed = start.elapsed();
+        println!("Spline using {:?} ns", elapsed.as_nanos());
+
+        let start = Instant::now();
+        if let Ok(idx) = data.binary_search(&value) {
+            assert_eq!(data[idx], value);
+        }
+        let elapsed = start.elapsed();
+        println!("Binary using {:?} ns", elapsed.as_nanos());
     }
 }
