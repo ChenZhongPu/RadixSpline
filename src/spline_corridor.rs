@@ -4,7 +4,6 @@
 //!
 //! For simplicity, only `u64` data type is allowed.
 
-
 #[derive(Clone, Copy, Debug)]
 pub struct Point {
     pub key: u64,        // x
@@ -101,7 +100,11 @@ pub struct GreedySplineCorridor<'a> {
 
 impl<'a> GreedySplineCorridor<'a> {
     pub fn new(data: &'a Vec<u64>, max_error: usize) -> Self {
-        GreedySplineCorridor { data, max_error, points: GreedySplineCorridor::spline_points(data, max_error) }
+        GreedySplineCorridor {
+            data,
+            max_error,
+            points: GreedySplineCorridor::spline_points(data, max_error),
+        }
     }
 
     pub fn points(&self) -> &Vec<Point> {
@@ -122,7 +125,6 @@ impl<'a> GreedySplineCorridor<'a> {
 
         // note `i` starts from `0`.
         for (i, &key) in data[2..].iter().enumerate() {
-
             let i = i + 2;
             let point_c = Point::new(key, i);
 
@@ -175,21 +177,24 @@ impl<'a> GreedySplineCorridor<'a> {
             Err(idx) if idx > 0 => {
                 let start = self.points[idx - 1];
                 let end = self.points[idx];
-                let predicted = start.position as f64 + (key as f64 - start.key as f64) * (end.position as f64 - start.position as f64) / (end.key as f64 - start.key as f64);
+                let predicted = start.position as f64
+                    + (key as f64 - start.key as f64)
+                        * (end.position as f64 - start.position as f64)
+                        / (end.key as f64 - start.key as f64);
                 let from = (predicted - self.max_error as f64).ceil() as usize;
                 let to = (predicted + self.max_error as f64).floor() as usize;
                 // binary search `from` `to` in `data`
                 match self.data[from..=to].binary_search(&key) {
-                    Ok(p) => Some(p+from),
+                    Ok(p) => Some(p + from),
                     _ => None,
                 }
                 // how about linear search after predicating?
                 // match self.data[from..=to].iter().position(|&x| x == key) {
                 //     Some(i) => Some(i + from),
                 //     _ => None,
-                // } 
-            },
-            _ => None
+                // }
+            }
+            _ => None,
         }
     }
 }
@@ -239,7 +244,7 @@ mod test {
         let data: Vec<u64> = vec![3, 4, 8, 8, 10, 10, 19, 20];
 
         let spline = GreedySplineCorridor::new(&data, 1);
-        
+
         assert_eq!(spline.search(8), Some(3));
 
         assert_eq!(spline.search(10), Some(4));
@@ -255,13 +260,16 @@ mod test {
         use std::time::Instant;
 
         let range = Uniform::from(0..10000000);
-        let mut data: Vec<u64> = rand::thread_rng().sample_iter(&range).take(1000000).collect();
+        let mut data: Vec<u64> = rand::thread_rng()
+            .sample_iter(&range)
+            .take(1000000)
+            .collect();
 
-        let value = 10000;
+        let value = 100;
         data.push(value);
-        
+
         data.sort_unstable();
-        
+
         let spline = GreedySplineCorridor::new(&data, 32);
 
         let start = Instant::now();
