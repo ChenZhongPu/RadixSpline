@@ -92,11 +92,14 @@ impl<'a> Builder<'a> {
         let start = self.points[self.table[curr_prefix]];
         let end = self.points[self.table[curr_prefix] + 1];
 
-        let predicted = start.position as f64
-            + (key as f64 - start.key as f64) * (end.position as f64 - start.position as f64)
-                / (end.key as f64 - start.key as f64);
-        let from = (predicted - self.max_error as f64).ceil() as usize;
-        let to = (predicted + self.max_error as f64).floor() as usize;
+        let predicted = start.position + (key as usize - start.key as usize) * (end.position - start.position) / (end.key as usize - start.key as usize);
+
+        let from = predicted.saturating_sub(self.max_error);
+        let to = if predicted + self.max_error > self.data.len() - 1 {
+            self.data.len() - 1
+        } else {
+            predicted + self.max_error
+        };
 
         // binary search `from` `to` in `data`
         match self.data[from..=to].binary_search(&key) {
