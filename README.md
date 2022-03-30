@@ -43,8 +43,8 @@ Both `GreedySplineCorridor` and `RadixSpline` are faster than a full range *bina
 
 In [benchmark.rs](src/bin/benchmark.rs), there are 10 million records, and we randomly conduct the searching using three methods. The average running time is reported as following:
 
-Binary Search | Spline Search | SplineRadix Search |
-------------- | ------------- | ------------------ |
-107 ns        | 70 ns  | 59 ns |
+| Binary Search | Spline Search | SplineRadix Search |
+| ------------- | ------------- | ------------------ |
+| 107 ns        | 70 ns         | 59 ns              |
 
 But in rare case, the plain binary search is even faster.
