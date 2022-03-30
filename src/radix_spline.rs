@@ -134,6 +134,9 @@ impl<'a> RadixSpline<'a> {
     pub fn search(&self, key: u64) -> Option<usize> {
         let c_prefix = ((key - self.min_key) >> self.shift_radix_bits) as usize;
 
+        // to do: there is a bug when searching the end of the data
+        // it may be overflow
+        
         let start = self.points[self.table[c_prefix]];
         let end = self.points[self.table[c_prefix] + 1];
 
