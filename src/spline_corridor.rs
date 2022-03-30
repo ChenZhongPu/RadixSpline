@@ -3,6 +3,8 @@
 //! Neumann, Thomas, and Sebastian Michel. "Smooth interpolating histograms with error guarantees." British National Conference on Databases. Springer, Berlin, Heidelberg, 2008.
 //!
 //! For simplicity, only `u64` data type is allowed.
+//! 
+//! This file is self-contained.
 
 #[derive(Clone, Copy, Debug)]
 pub struct Point {
@@ -107,6 +109,11 @@ impl<'a> GreedySplineCorridor<'a> {
         }
     }
 
+    /// default `max_error` is 32
+    pub fn default(data: &'a Vec<u64>) -> Self {
+        GreedySplineCorridor::new(data, 32)
+    }
+
     pub fn points(&self) -> &Vec<Point> {
         &self.points
     }
@@ -177,12 +184,16 @@ impl<'a> GreedySplineCorridor<'a> {
             Err(idx) if idx > 0 => {
                 let start = self.points[idx - 1];
                 let end = self.points[idx];
-                let predicted = start.position as f64
-                    + (key as f64 - start.key as f64)
-                        * (end.position as f64 - start.position as f64)
-                        / (end.key as f64 - start.key as f64);
-                let from = (predicted - self.max_error as f64).ceil() as usize;
-                let to = (predicted + self.max_error as f64).floor() as usize;
+                let predicted = start.position 
+                    + (key as usize - start.key as usize)
+                        * (end.position - start.position)
+                        / (end.key as usize - start.key as usize);
+                let from = predicted.saturating_sub(self.max_error);
+                let to = if predicted + self.max_error > self.data.len() - 1 {
+                    self.data.len() - 1
+                } else {
+                    predicted + self.max_error
+                };
                 // binary search `from` `to` in `data`
                 match self.data[from..=to].binary_search(&key) {
                     Ok(p) => Some(p + from),
