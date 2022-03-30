@@ -19,12 +19,10 @@ The [src/spline_corridor.rs](src/spline_corridor.rs) is self-contained source co
 let spline = GreedySplineCorridor::default(&data);
 if let Some(idx) = spline.search(value) {
     assert_eq!(data[idx], value);
-} else {
-    panic!("Error when spline searching!");
 }
 ```
 
-The second one is the focus *RadixSpline*, and Its search process has three steps:
+The second one is the *RadixSpline*, and its search process has three steps:
 
 - A predication within an error bound.
 - A second binary search in a narrower range.
@@ -33,8 +31,6 @@ The second one is the focus *RadixSpline*, and Its search process has three step
 let radix_spline = RadixSpline::default(&data);
 if let Some(idx) = radix_spline.search(value) {
     assert_eq!(data[idx], value);
-} else {
-    panic!("Error when radix spline searching!");
 }
 ```
 

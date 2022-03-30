@@ -11,7 +11,7 @@ pub struct RadixSpline<'a> {
     min_key: u64,
     shift_radix_bits: u32, // it is computed from `num_radix_bits`
     max_error: usize,      // max error bound
-    points: Vec<Point>,    // spline points
+    pub points: Vec<Point>,    // spline points
     table: Vec<usize>,     // radix table
 }
 
@@ -110,7 +110,7 @@ impl<'a> RadixSpline<'a> {
                 let from_idx = ((p_base.key() - min_key) >> shift_radix_bits) as usize;
                 let to_idx = ((c_base.key() - min_key) >> shift_radix_bits) as usize;
                 table[to_idx] = points.len() - 1;
-                for i in from_idx..to_idx {
+                for i in from_idx+1..to_idx {
                     table[i] = points.len() - 2;
                 }
             } else {
@@ -139,9 +139,11 @@ impl<'a> RadixSpline<'a> {
         let from_idx = ((p_base.key() - min_key) >> shift_radix_bits) as usize;
         let to_idx = ((c_base.key() - min_key) >> shift_radix_bits) as usize;
         table[to_idx] = points.len() - 1;
-        for i in from_idx..to_idx {
+        for i in from_idx+1..to_idx {
             table[i] = points.len() - 2;
         }
+
+        assert_eq!(points[points.len() - 1].key(), data[n - 1]);
     }
 
     /// default `max_radix_bits` is 18, and default `max_error` is 32
@@ -151,13 +153,31 @@ impl<'a> RadixSpline<'a> {
 
     /// search a given `key`
     pub fn search(&self, key: u64) -> Option<usize> {
-        let c_prefix = ((key - self.min_key) >> self.shift_radix_bits) as usize;
+        let mut c_prefix = ((key - self.min_key) >> self.shift_radix_bits) as usize;
 
-        // to do: there is a bug when searching the end of the data
-        // it may be overflow
+        let mut start = self.points[self.table[c_prefix]];
+        if start.key() == key {
+            return Some(start.position());
+        }
+        let end;
+        // assert: start.key() < key < end.key()
+        // this is to fix the bug: `key` may be less than `start.key()`
+        // but why? (maybe some problem with the `table` building)
+        while start.key() > key {
+            c_prefix -= 1;
+            start = self.points[self.table[c_prefix]];
+        } 
+        end = self.points[self.table[c_prefix] + 1];
 
-        let start = self.points[self.table[c_prefix]];
-        let end = self.points[self.table[c_prefix] + 1];
+        if start.key() == key {
+            return Some(start.position());
+        }
+        if end.key() == key {
+            return Some(end.position());
+        }
+
+        assert!(start.key() < key);
+        // assert!(key < end.key()); // still a bug: in rare case
 
         let predicted = start.position()
             + (key as usize - start.key() as usize) * (end.position() - start.position())

@@ -22,6 +22,7 @@ fn main() {
     search_keys.extend_from_slice(&data[len - 10000..len - 9990]);
     search_keys.extend_from_slice(&data[len - 1000..len - 990]);
     search_keys.extend_from_slice(&data[len - 100..len - 90]);
+    search_keys.extend_from_slice(&data[len - 10..]);
     // method 1: binary search
     let mut total = 0;
     for &key in &search_keys {
@@ -61,6 +62,7 @@ fn main() {
 
     // method 3: radix spline search
     let radix_spline = RadixSpline::default(&data);
+    // println!("points: {:?}", radix_spline.points);
     let mut total = 0;
     for &key in &search_keys {
         let start = Instant::now();
