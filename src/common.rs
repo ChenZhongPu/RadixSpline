@@ -5,13 +5,13 @@
 /// When it is compared, only *key* is involved.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Point {
-    key: u64, // x
+    key: u64,        // x
     position: usize, // y
 }
 
 impl Point {
     pub fn new(key: u64, position: usize) -> Self {
-        Point {key, position }
+        Point { key, position }
     }
 
     pub fn key(&self) -> u64 {

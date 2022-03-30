@@ -3,7 +3,7 @@
 //! Neumann, Thomas, and Sebastian Michel. "Smooth interpolating histograms with error guarantees." British National Conference on Databases. Springer, Berlin, Heidelberg, 2008.
 //!
 //! For simplicity, only `u64` data type is allowed.
-//! 
+//!
 //! This file is self-contained.
 
 #[derive(Clone, Copy, Debug)]
@@ -184,9 +184,8 @@ impl<'a> GreedySplineCorridor<'a> {
             Err(idx) if idx > 0 => {
                 let start = self.points[idx - 1];
                 let end = self.points[idx];
-                let predicted = start.position 
-                    + (key as usize - start.key as usize)
-                        * (end.position - start.position)
+                let predicted = start.position
+                    + (key as usize - start.key as usize) * (end.position - start.position)
                         / (end.key as usize - start.key as usize);
                 let from = predicted.saturating_sub(self.max_error);
                 let to = if predicted + self.max_error > self.data.len() - 1 {

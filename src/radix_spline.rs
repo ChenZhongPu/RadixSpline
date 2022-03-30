@@ -1,8 +1,8 @@
 //! # A builder for radix spline index
 //! Building the `spline points` and `radix table` in **one-pass**.
 
-use crate::common::Point;
 use crate::common::Line;
+use crate::common::Point;
 
 /// `RadixSpline` builds an index for sorted data (assuming `u64`).
 /// Given a `key`, we compute it by `shift_radix_bits` -> the index of `table`. And the value of `table` is a pointer, indicting the position of `points`. `points` is an error-bounded spline by interpolating, and it can be used to predict the position of `key`.
@@ -10,9 +10,9 @@ pub struct RadixSpline<'a> {
     data: &'a Vec<u64>, // sorted data
     min_key: u64,
     shift_radix_bits: u32, // it is computed from `num_radix_bits`
-    max_error: usize, // max error bound
-    points: Vec<Point>, // spline points
-    table: Vec<usize>, // radix table
+    max_error: usize,      // max error bound
+    points: Vec<Point>,    // spline points
+    table: Vec<usize>,     // radix table
 }
 
 fn get_num_shift_bits(diff: u64, num_radix_bits: u32) -> u32 {
@@ -22,7 +22,7 @@ fn get_num_shift_bits(diff: u64, num_radix_bits: u32) -> u32 {
         0
     } else {
         64 - num_radix_bits - zeros
-    }    
+    }
 }
 
 impl<'a> RadixSpline<'a> {
@@ -40,13 +40,33 @@ impl<'a> RadixSpline<'a> {
         let mut points: Vec<Point> = vec![];
 
         // build `points` and `table`
-        RadixSpline::build(&mut points, &mut table, data, min_key, shift_radix_bits, max_error);
+        RadixSpline::build(
+            &mut points,
+            &mut table,
+            data,
+            min_key,
+            shift_radix_bits,
+            max_error,
+        );
 
-        RadixSpline { data, min_key, shift_radix_bits, max_error, points, table }
+        RadixSpline {
+            data,
+            min_key,
+            shift_radix_bits,
+            max_error,
+            points,
+            table,
+        }
     }
 
-    fn build(points: &mut Vec<Point>, table: &mut Vec<usize>, data: &Vec<u64>, min_key: u64, shift_radix_bits: u32, max_error: usize) {
-
+    fn build(
+        points: &mut Vec<Point>,
+        table: &mut Vec<usize>,
+        data: &Vec<u64>,
+        min_key: u64,
+        shift_radix_bits: u32,
+        max_error: usize,
+    ) {
         points.push(Point::new(data[0], 0));
 
         let mut p_base;
@@ -67,15 +87,15 @@ impl<'a> RadixSpline<'a> {
             let bu = Line::new(c_base, upper);
             // line BL (base -> lower)
             let bl = Line::new(c_base, lower);
-            
+
             // continue if `bc` or `bu` or `bl`'s `dx` is 0
             // skip the repeated values
             if bc.is_vertical() || bu.is_vertical() || bl.is_vertical() {
                 upper = Point::new(point_c.key(), i + max_error);
                 lower = Point::new(point_c.key(), i.saturating_sub(max_error));
                 continue;
-            }   
-            
+            }
+
             if bc.is_left(&bu) || bc.is_right(&bl) {
                 // update base
                 p_base = c_base;
@@ -86,7 +106,7 @@ impl<'a> RadixSpline<'a> {
                 upper = Point::new(point_c.key(), i + max_error);
                 lower = Point::new(point_c.key(), i.saturating_sub(max_error));
                 // update `table`
-                // from `key` of `p_base` to `key` of `c_base` 
+                // from `key` of `p_base` to `key` of `c_base`
                 let from_idx = ((p_base.key() - min_key) >> shift_radix_bits) as usize;
                 let to_idx = ((c_base.key() - min_key) >> shift_radix_bits) as usize;
                 table[to_idx] = points.len() - 1;
@@ -108,7 +128,6 @@ impl<'a> RadixSpline<'a> {
                     lower = _lower;
                 }
             }
-
         } // end of for
 
         p_base = c_base;
@@ -136,18 +155,20 @@ impl<'a> RadixSpline<'a> {
 
         // to do: there is a bug when searching the end of the data
         // it may be overflow
-        
+
         let start = self.points[self.table[c_prefix]];
         let end = self.points[self.table[c_prefix] + 1];
 
-        let predicted = start.position() + (key as usize - start.key() as usize) * (end.position() - start.position()) / (end.key() as usize - start.key() as usize);
+        let predicted = start.position()
+            + (key as usize - start.key() as usize) * (end.position() - start.position())
+                / (end.key() as usize - start.key() as usize);
 
         let from = predicted.saturating_sub(self.max_error);
         let to = if predicted + self.max_error > self.data.len() - 1 {
             self.data.len() - 1
         } else {
             predicted + self.max_error
-        };        
+        };
 
         // binary search `from` `to` in `data`
         match self.data[from..=to].binary_search(&key) {
@@ -164,7 +185,7 @@ mod test {
     #[test]
     fn search() {
         use rand::{distributions::Uniform, Rng};
-        
+
         let range = Uniform::from(0..10000000);
         let mut data: Vec<u64> = rand::thread_rng()
             .sample_iter(&range)
@@ -175,12 +196,12 @@ mod test {
         data.push(value);
 
         data.sort_unstable();
-        
+
         let radix_spline = RadixSpline::default(&data);
 
         match radix_spline.search(value) {
             Some(idx) => assert_eq!(data[idx], value),
-            None => panic!("Error when searching!")
+            None => panic!("Error when searching!"),
         }
     }
 }

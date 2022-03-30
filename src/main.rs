@@ -14,7 +14,6 @@ fn main() {
 
     data.sort_unstable();
 
-
     // method 1: binary search
     let start = Instant::now();
     if let Ok(idx) = data.binary_search(&value) {
@@ -34,8 +33,8 @@ fn main() {
         panic!("Error when spline searching!");
     }
     let elapsed = start.elapsed();
-    println!("Spline search using {:?} ns", elapsed.as_nanos());  
-    
+    println!("Spline search using {:?} ns", elapsed.as_nanos());
+
     // method 3: radix spline search
     let radix_spline = RadixSpline::default(&data);
     let start = Instant::now();

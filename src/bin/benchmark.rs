@@ -11,7 +11,6 @@ fn main() {
 
     data.sort_unstable();
 
-
     let mut search_keys = vec![];
     let len = data.len();
     search_keys.extend_from_slice(&data[100..110]);
@@ -36,7 +35,10 @@ fn main() {
         total += elapsed.as_nanos();
     }
 
-    println!("Binary search using {:?} ns", total / search_keys.len() as u128);
+    println!(
+        "Binary search using {:?} ns",
+        total / search_keys.len() as u128
+    );
 
     let spline = GreedySplineCorridor::default(&data);
     let mut total = 0;
@@ -52,8 +54,11 @@ fn main() {
         total += elapsed.as_nanos();
     }
 
-    println!("Spline search using {:?} ns", total / search_keys.len() as u128);
-    
+    println!(
+        "Spline search using {:?} ns",
+        total / search_keys.len() as u128
+    );
+
     // method 3: radix spline search
     let radix_spline = RadixSpline::default(&data);
     let mut total = 0;
@@ -67,5 +72,8 @@ fn main() {
         let elapsed = start.elapsed();
         total += elapsed.as_nanos();
     }
-    println!("SplineRadix search using {:?} ns", total / search_keys.len() as u128);
+    println!(
+        "SplineRadix search using {:?} ns",
+        total / search_keys.len() as u128
+    );
 }
