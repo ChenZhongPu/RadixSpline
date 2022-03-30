@@ -38,7 +38,7 @@ if let Some(idx) = radix_spline.search(value) {
 }
 ```
 
-## Performance
+### Performance
 Both `GreedySplineCorridor` and `RadixSpline` are faster than a full range *binary search*, as those two conduct the searching in a much smaller range.
 
 In [benchmark.rs](src/bin/benchmark.rs), there are 10 million records, and we randomly conduct the searching using three methods. The average running time is reported as following:
