@@ -6,7 +6,7 @@ For simplicity, only `u64` is allowed for `key`'s type.
 ### Overview
 In this repository, two methods are implemented respectively. 
 
-The first one is *Greedy Spline Corridor*, and its main idea is to use interpolate the sorted data. Its search process has three steps given a `key`:
+The first one is *Greedy Spline Corridor*, and its main idea is to interpolating the sorted data. Its search process has three steps given a `key`:
 
 - A binary search to get the bound. Note that if the `key` is found now, it can return the position directly.
 - A predication within an error bound.
@@ -24,7 +24,7 @@ if let Some(idx) = spline.search(value) {
 
 The second one is the *RadixSpline*, and its search process has three steps:
 
-- A predication within an error bound.
+- A predication within an error bound. Note that if the `key` is found now, it can return the position directly.
 - A second binary search in a narrower range.
 
 ```rust
