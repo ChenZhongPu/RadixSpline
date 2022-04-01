@@ -90,6 +90,9 @@ impl<'a> Builder<'a> {
         let curr_prefix = ((key - self.min_key) >> self.shift_radix_bits) as usize;
 
         let start = self.points[self.table[curr_prefix]];
+        if start.key == key {
+            return Some(start.position);
+        }
         let end = self.points[self.table[curr_prefix] + 1];
 
         let predicted = start.position + (key as usize - start.key as usize) * (end.position - start.position) / (end.key as usize - start.key as usize);
