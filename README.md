@@ -22,7 +22,7 @@ if let Some(idx) = spline.search(value) {
 }
 ```
 
-The second one is the *RadixSpline*, and its search process has three steps:
+The second one is the *RadixSpline*, and its search process has two steps:
 
 - A predication within an error bound. Note that if the `key` is found now, it can return the position directly.
 - A second binary search in a narrower range.
