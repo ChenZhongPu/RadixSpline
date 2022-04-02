@@ -59,6 +59,25 @@ impl<'a> RadixSpline<'a> {
         }
     }
 
+    fn build_table(data: &[u64], table: &mut Vec<usize>, min_key: u64, point_key: u64, points_size: usize, last_prefix: usize, shift_radix_bits: u32) -> usize {
+        let mut last_prefix = last_prefix;
+        for &value in data {
+            let curr_prefix = ((value - min_key) >> shift_radix_bits) as usize;
+            // get the `position` of `data[idx]`
+            // only need to compare with the last element in `points` (i.e., `c_base`)
+            let position = if value == point_key {
+                points_size - 1
+            } else {
+                points_size - 2
+            };
+            for i in last_prefix + 1..=curr_prefix {
+                table[i] = position;
+            }
+            last_prefix = curr_prefix;
+        }
+        last_prefix
+    }
+
     fn build(
         points: &mut Vec<Point>,
         table: &mut Vec<usize>,
@@ -100,9 +119,6 @@ impl<'a> RadixSpline<'a> {
             }
 
             if bc.is_left(&bu) || bc.is_right(&bl) {
-                // update base
-                // p_base = c_base;
-
                 c_base = Point::new(data[i - 1], i - 1);
                 points.push(c_base);
 
@@ -110,23 +126,7 @@ impl<'a> RadixSpline<'a> {
                 lower = Point::new(point_c.key(), i.saturating_sub(max_error));
 
                 // update table
-                // check data from `last_index` (inclusive) to `i` (exclusive)
-                for &value in &data[last_index..i] {
-                    let curr_prefix = ((value - min_key) >> shift_radix_bits) as usize;
-                    // get the `position` of `data[idx]`
-                    // only need to compare with the last element in `points` (i.e., `c_base`)
-                    let position = if value == c_base.key() {
-                        points.len() - 1
-                    } else {
-                        points.len() - 2
-                    };
-
-                    for ip in (last_prefix + 1)..=curr_prefix {
-                        table[ip] = position;
-                    }
-
-                    last_prefix = curr_prefix;
-                }
+                last_prefix = RadixSpline::build_table(&data[last_index..i], table, min_key, c_base.key(), points.len(), last_prefix, shift_radix_bits);
                 last_index = i;
             } else {
                 let _upper = Point::new(point_c.key(), i + max_error);
@@ -150,23 +150,7 @@ impl<'a> RadixSpline<'a> {
         points.push(Point::new(data[n - 1], n - 1));
 
         // update table
-        // check data from `last_index` (inclusive) to `n` (exclusive)
-        for &value in &data[last_index..n] {
-            let curr_prefix = ((value - min_key) >> shift_radix_bits) as usize;
-            // get the `position` of `data[idx]`
-            // only need to compare with the last element in `points` (i.e., `data[n-1]`)
-            let position = if value == data[n - 1] {
-                points.len() - 1
-            } else {
-                points.len() - 2
-            };
-
-            for ip in (last_prefix + 1)..=curr_prefix {
-                table[ip] = position;
-            }
-
-            last_prefix = curr_prefix;
-        }
+        RadixSpline::build_table(&data[last_index..n], table, min_key, data[n-1], points.len(), last_prefix, shift_radix_bits);
     }
 
     /// default `max_radix_bits` is 18, and default `max_error` is 32
@@ -185,6 +169,8 @@ impl<'a> RadixSpline<'a> {
         }
         let end = self.points[self.table[c_prefix] + 1];
 
+        // no need to use `f64` as `usize` is faster.
+        // it is fine to always lose the precision.
         let predicted = start.position()
             + (key as usize - start.key() as usize) * (end.position() - start.position())
                 / (end.key() as usize - start.key() as usize);
