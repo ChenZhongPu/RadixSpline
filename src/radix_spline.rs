@@ -59,7 +59,15 @@ impl<'a> RadixSpline<'a> {
         }
     }
 
-    fn build_table(data: &[u64], table: &mut Vec<usize>, min_key: u64, point_key: u64, points_size: usize, last_prefix: usize, shift_radix_bits: u32) -> usize {
+    fn build_table(
+        data: &[u64],
+        table: &mut Vec<usize>,
+        min_key: u64,
+        point_key: u64,
+        points_size: usize,
+        last_prefix: usize,
+        shift_radix_bits: u32,
+    ) -> usize {
         let mut last_prefix = last_prefix;
         for &value in data {
             let curr_prefix = ((value - min_key) >> shift_radix_bits) as usize;
@@ -126,7 +134,15 @@ impl<'a> RadixSpline<'a> {
                 lower = Point::new(point_c.key(), i.saturating_sub(max_error));
 
                 // update table
-                last_prefix = RadixSpline::build_table(&data[last_index..i], table, min_key, c_base.key(), points.len(), last_prefix, shift_radix_bits);
+                last_prefix = RadixSpline::build_table(
+                    &data[last_index..i],
+                    table,
+                    min_key,
+                    c_base.key(),
+                    points.len(),
+                    last_prefix,
+                    shift_radix_bits,
+                );
                 last_index = i;
             } else {
                 let _upper = Point::new(point_c.key(), i + max_error);
@@ -150,7 +166,15 @@ impl<'a> RadixSpline<'a> {
         points.push(Point::new(data[n - 1], n - 1));
 
         // update table
-        RadixSpline::build_table(&data[last_index..n], table, min_key, data[n-1], points.len(), last_prefix, shift_radix_bits);
+        RadixSpline::build_table(
+            &data[last_index..n],
+            table,
+            min_key,
+            data[n - 1],
+            points.len(),
+            last_prefix,
+            shift_radix_bits,
+        );
     }
 
     /// default `max_radix_bits` is 18, and default `max_error` is 32
