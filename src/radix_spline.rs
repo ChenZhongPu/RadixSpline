@@ -78,9 +78,7 @@ impl<'a> RadixSpline<'a> {
             } else {
                 points_size - 2
             };
-            for i in last_prefix + 1..=curr_prefix {
-                table[i] = position;
-            }
+            table[last_prefix + 1..=curr_prefix].fill(position);
             last_prefix = curr_prefix;
         }
         last_prefix
