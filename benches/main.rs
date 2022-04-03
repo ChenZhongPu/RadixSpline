@@ -1,5 +1,7 @@
 use radix_spline::GreedySplineCorridor;
 use radix_spline::RadixSpline;
+use rand::{distributions::Uniform, Rng};
+use std::process::exit;
 use std::time::Instant;
 
 use std::fs::File;
@@ -20,12 +22,35 @@ fn load_data(path: &str) -> Vec<u64> {
     data
 }
 
+fn random_data_keys() -> (Vec<u64>, Vec<u64>) {
+    let range = Uniform::from(0..100000000);
+    let mut data: Vec<u64> = rand::thread_rng()
+        .sample_iter(&range)
+        .take(10000000)
+        .collect();
+    let mut keys = vec![];
+    keys.extend_from_slice(&data[0..100000]);
+    data.sort_unstable();
+    (data, keys)
+}
+
 fn main() {
-    let data = load_data("data/fb_200M_uint64");
-    println!("load data...");
-    let keys = load_data("data/fb_20K_unit64");
+    let args: Vec<String> = std::env::args().collect();
+    let data;
+    let keys;
+    dbg!(&args);
+    if args.len() == 2 {
+        println!("Generating random data...");
+        (data, keys) = random_data_keys();
+    } else if args.len() == 4 {
+        println!("Loading data...");
+        data = load_data(&args[1]);
+        keys = load_data(&args[2]);
+    } else {
+        println!("Usage: {} <path> <path>", args[0]);
+        exit(0);
+    }
     bench(&data, &keys);
-    // let radix_spline = RadixSpline::default(&data);
 }
 
 fn bench(data: &Vec<u64>, keys: &Vec<u64>) {
@@ -57,7 +82,6 @@ fn bench(data: &Vec<u64>, keys: &Vec<u64>) {
         if let Some(idx) = radix_spline.search(*key) {
             assert_eq!(&data[idx], key);
         } else {
-            println!("key = {}", key);
             panic!("Error when radix spline searching!");
         }
         let elapsed = start.elapsed();

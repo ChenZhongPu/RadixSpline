@@ -7,7 +7,7 @@
 //! This file is self-contained.
 
 #[derive(Clone, Copy, Debug)]
-pub struct Point {
+struct Point {
     pub key: u64,        // x
     pub position: usize, // y
 }
@@ -112,10 +112,6 @@ impl<'a> GreedySplineCorridor<'a> {
     /// default `max_error` is 32
     pub fn default(data: &'a Vec<u64>) -> Self {
         GreedySplineCorridor::new(data, 32)
-    }
-
-    pub fn points(&self) -> &Vec<Point> {
-        &self.points
     }
 
     fn spline_points(data: &Vec<u64>, max_error: usize) -> Vec<Point> {
@@ -251,7 +247,7 @@ mod test {
 
     #[test]
     fn search() {
-        let data: Vec<u64> = vec![3, 4, 8, 8, 10, 10, 19, 20];
+        let data: Vec<u64> = vec![3, 4, 6, 8, 10, 19, 20];
 
         let spline = GreedySplineCorridor::new(&data, 1);
 

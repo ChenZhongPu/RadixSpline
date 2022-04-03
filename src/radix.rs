@@ -1,6 +1,8 @@
 //! # A builder for radix spline index
 //! Building the `spline points` and `radix table` in **one-pass**.
 
+use std::process::id;
+
 use crate::common::Line;
 use crate::common::Point;
 
@@ -35,7 +37,7 @@ impl<'a> RadixSpline<'a> {
         let shift_radix_bits = get_num_shift_bits(max_key - min_key, num_radix_bits);
 
         let max_prefix = (max_key - min_key) >> shift_radix_bits;
-        let mut table = vec![0 as usize; (max_prefix + 2) as usize];
+        let mut table = vec![0; (max_prefix + 2) as usize];
 
         let mut points: Vec<Point> = vec![];
 
@@ -59,36 +61,9 @@ impl<'a> RadixSpline<'a> {
         }
     }
 
-    fn build_table(
-        data: &[u64],
-        table: &mut Vec<usize>,
-        min_key: u64,
-        point_key: u64,
-        points_size: usize,
-        last_prefix: usize,
-        shift_radix_bits: u32,
-    ) -> usize {
-        let mut last_prefix = last_prefix;
-        for &value in data {
-            let curr_prefix = ((value - min_key) >> shift_radix_bits) as usize;
-            // get the `position` of `data[idx]`
-            // only need to compare with the last element in `points` (i.e., `c_base`)
-            let position = if value == point_key {
-                points_size - 1
-            } else {
-                points_size - 2
-            };
-            for i in last_prefix + 1..=curr_prefix {
-                table[i] = position;
-            }
-            last_prefix = curr_prefix;
-        }
-        last_prefix
-    }
-
     fn build(
         points: &mut Vec<Point>,
-        table: &mut Vec<usize>,
+        table: &mut [usize],
         data: &Vec<u64>,
         min_key: u64,
         shift_radix_bits: u32,
@@ -96,16 +71,13 @@ impl<'a> RadixSpline<'a> {
     ) {
         points.push(Point::new(data[0], 0));
 
-        // let mut p_base;
         let mut c_base = Point::new(data[0], 0);
 
         // error corridor bounds
         let mut upper = Point::new(data[1], 1 + max_error);
         let mut lower = Point::new(data[1], 1usize.saturating_sub(max_error));
 
-        let mut last_index = 1; // `index` of data
-        let mut last_prefix = 0usize; // after shifting
-
+        let mut last_prefix = 0usize;
         // note `i` starts from `0`
         for (i, &key) in data[2..].iter().enumerate() {
             let i = i + 2;
@@ -129,21 +101,17 @@ impl<'a> RadixSpline<'a> {
             if bc.is_left(&bu) || bc.is_right(&bl) {
                 c_base = Point::new(data[i - 1], i - 1);
                 points.push(c_base);
+                
+                // update table
+                let current_prefix = ((data[i - 1] - min_key) >> shift_radix_bits) as usize;
+                if current_prefix > last_prefix {
+                    table[last_prefix+1..=current_prefix].fill(points.len() - 1);
+                    last_prefix = current_prefix;
+                }
+                // end updating table
 
                 upper = Point::new(point_c.key(), i + max_error);
                 lower = Point::new(point_c.key(), i.saturating_sub(max_error));
-
-                // update table
-                last_prefix = RadixSpline::build_table(
-                    &data[last_index..i],
-                    table,
-                    min_key,
-                    c_base.key(),
-                    points.len(),
-                    last_prefix,
-                    shift_radix_bits,
-                );
-                last_index = i;
             } else {
                 let _upper = Point::new(point_c.key(), i + max_error);
                 let _lower = Point::new(point_c.key(), i.saturating_sub(max_error));
@@ -161,20 +129,16 @@ impl<'a> RadixSpline<'a> {
             }
         } // end of for
 
-        // p_base = c_base;
         let n = data.len();
         points.push(Point::new(data[n - 1], n - 1));
 
         // update table
-        RadixSpline::build_table(
-            &data[last_index..n],
-            table,
-            min_key,
-            data[n - 1],
-            points.len(),
-            last_prefix,
-            shift_radix_bits,
-        );
+        let current_prefix = ((data[n - 1] - min_key) >> shift_radix_bits) as usize;
+        if current_prefix > last_prefix {
+            table[last_prefix + 1..=current_prefix].fill(points.len() - 1);
+            last_prefix = current_prefix;
+        }
+        table[last_prefix + 1..].fill(points.len());
     }
 
     /// default `max_radix_bits` is 18, and default `max_error` is 32
@@ -182,22 +146,47 @@ impl<'a> RadixSpline<'a> {
         RadixSpline::new(data, 18, 32)
     }
 
-    /// search a given `key`
-    pub fn search(&self, key: u64) -> Option<usize> {
+    fn get_spline_segment(&self, key: u64) -> usize {
         let c_prefix = ((key - self.min_key) >> self.shift_radix_bits) as usize;
 
-        let start = self.points[self.table[c_prefix]];
+        let _start = self.table[c_prefix];
+        let _end = self.table[c_prefix + 1];
 
-        if start.key() == key {
-            return Some(start.position());
+        if _end - _start < 32 {
+            // linear search
+            let mut _current = _start;
+            while self.points[_current].key() < key {
+                _current += 1;
+            }
+            return _current;
         }
-        let end = self.points[self.table[c_prefix] + 1];
 
+        // a binary search
+        let key_point = Point::new(key, 0);
+        match self.points[_start.._end].binary_search(&key_point) {
+             Ok(idx) => _start + idx,
+             Err(idx) => _start + idx,
+        }
+    } 
+    /// search a given `key`
+    pub fn search(&self, key: u64) -> Option<usize> {
+
+        let point_location = self.get_spline_segment(key);
+        if self.points[point_location].key() == key {
+            return Some(self.points[point_location].position())
+        }
+        if point_location == 0 {
+            return None
+        }
+        let start = self.points[point_location - 1];
+
+        let end = self.points[point_location];
         // no need to use `f64` as `usize` is faster.
         // it is fine to always lose the precision.
         let predicted = start.position()
             + (key as usize - start.key() as usize) * (end.position() - start.position())
                 / (end.key() as usize - start.key() as usize);
+
 
         let from = predicted.saturating_sub(self.max_error);
         let to = if predicted + self.max_error > self.data.len() - 1 {
